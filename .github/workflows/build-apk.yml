@@ -23,27 +23,26 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Extract project
-        run: |
-          unzip -q Neuromores_Android_Project.zip -d extracted
+        run: unzip -q Neuromores_Android_Project.zip -d extracted
       - name: Align Java and Kotlin JVM targets
+        shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
           p = Path("extracted/NeuromoresAndroid/app/build.gradle.kts")
           s = p.read_text()
-          block = """android {
+          marker = "android {"
+          if marker not in s:
+              raise SystemExit("Could not find android { in " + str(p))
+          if "sourceCompatibility = JavaVersion.VERSION_17" not in s:
+              s = s.replace(marker, marker + """
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
-          """
-          if "sourceCompatibility = JavaVersion.VERSION_17" not in s:
-              s, n = re.subn(r"android\\s*\\{", block, s, count=1)
-              if n != 1:
-                  raise SystemExit("Could not find android { block in app/build.gradle.kts")
+          """, 1)
           p.write_text(s)
-          print(p.read_text())
+          print("Updated Java compile target to 17")
           PY
       - name: Build debug APK
         run: gradle -p extracted/NeuromoresAndroid :app:assembleDebug --no-daemon
